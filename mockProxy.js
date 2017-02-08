@@ -4,31 +4,50 @@ var url = require('url')
     , http = require('http')
     , https = require('https')
     , httpProxy = require('http-proxy')
+    , queryString = require('querystring')
+    , MongoClient = require('mongodb').MongoClient
     ;
 
 var PORT = process.argv[2] || 9000;
+var DBLink = "mongodb://localhost:27017/mockDB";
+var collectionName = "test1";
 
 var server = http.createServer(function(req, res) {
     var options = url.parse(req.url);
     options.headers = req.headers;
     delete options.headers['accept-encoding'];
     options.method = req.method;
+
     if (needGetFromLocal(options.host)) {
         res.setHeader('Content-Type', 'application/json');
         res.write('{"name":"Ben"}');
         res.end();
-    } else if ("capi.coupang.com" == options.host){
+
+        var doc = {"vid":12341, "pid":334, "memberId": "xxxxx"};
+        var json = {"name":"Ben"};
+
+    } else if (options.host.indexOf("coupang.com") != -1){
         var body = [];
         log("requesting " + req.url);
-        var connector = (options.protocol == 'https:' ? https : http).request(options, function(serverResponse) {
-                serverResponse.on('data', function(chunk) {
-                    body.push(chunk);
-                }).on('end', function() {
-                    log(body.toString());
+        var queryParse = queryString.parse(options.query);
+
+        findData(queryParse, function (item) {
+            if (item != null) {
+                res.setHeader('Content-Type', 'application/json');
+                res.write(item);
+                res.end();
+            } else {
+                var connector = (options.protocol == 'https:' ? https : http).request(options, function(serverResponse) {
+                    serverResponse.on('data', function(chunk) {
+                        body.push(chunk);
+                    }).on('end', function() {
+                        saveToDB(queryParse, body.toString());
+                    });
+                    serverResponse.pipe(res, {end:true});
                 });
-                serverResponse.pipe(res, {end:true});
+                req.pipe(connector, {end:true});
+            }
         });
-        req.pipe(connector, {end:true});
     } else {
         var connector = (options.protocol == 'https:' ? https : http).request(options, function(serverResponse) {
             res.writeHeader(serverResponse.statusCode, serverResponse.headers);
@@ -38,14 +57,36 @@ var server = http.createServer(function(req, res) {
     }
 });
 
-function writeToFile(body) {
-    var fs = require('fs');
-    fs.writeFile("/Users/byao/Ben/TEMP/benMock.json", body , function(err) {
-        if(err) {
-            return console.log(err);
-        }
+function saveToDB(doc, value) {
+    MongoClient.connect(DBLink, function(err, db) {
+        if(err) { return console.dir(err); }
 
-        log("The file was saved!");
+        var collection = db.collection(collectionName, function(err, collection) {});
+        collection.findOne(doc, function(err, item) {
+            if (item == null) {
+                doc["JSON"] = value;
+                collection.insertOne(doc);
+            } else {
+                // have the record, should not update
+            }
+
+        });
+    });
+}
+
+function findData(doc, callback) {
+    MongoClient.connect(DBLink, function(err, db) {
+        if(err) { return console.dir(err); }
+
+        var collection = db.collection(collectionName, function(err, collection) {});
+        collection.findOne(doc, function(err, item) {
+            if (item == null) {
+                callback(null);
+            } else {
+                callback(item.JSON);
+            }
+
+        });
     });
 }
 
