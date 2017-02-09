@@ -19,23 +19,14 @@ var server = http.createServer(function(req, res) {
     options.method = req.method;
 
     if (needGetFromLocal(options.host)) {
-        res.setHeader('Content-Type', 'application/json');
-        res.write('{"name":"Ben"}');
-        res.end();
-
-        var doc = {"vid":12341, "pid":334, "memberId": "xxxxx"};
-        var json = {"name":"Ben"};
-
+        writeJson(res,'{"name":"Ben"}');
     } else if (options.host.indexOf("coupang.com") != -1){
         var body = [];
-        log("requesting " + req.url);
         var queryParse = queryString.parse(options.query);
 
         findData(queryParse, function (item) {
             if (item != null) {
-                res.setHeader('Content-Type', 'application/json');
-                res.write(item);
-                res.end();
+                writeJson(res, item);
             } else {
                 var connector = (options.protocol == 'https:' ? https : http).request(options, function(serverResponse) {
                     serverResponse.on('data', function(chunk) {
@@ -72,6 +63,12 @@ function saveToDB(doc, value) {
 
         });
     });
+}
+
+function writeJson(res, jsonString) {
+    res.setHeader('Content-Type', 'application/json');
+    res.write(jsonString);
+    res.end();
 }
 
 function findData(doc, callback) {
