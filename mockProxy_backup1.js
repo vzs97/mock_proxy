@@ -9,13 +9,13 @@ var url = require('url')
     , fs = require('fs')
     , net = require('net')
     , zlib = require('zlib');
-;
+    ;
 
 
 var PORT = process.argv[2] || 9001;
 var DBLink = "mongodb://localhost:27017/mockDB";
 var ignoreDB = false;
-var regularProxy = httpProxy.createServer();
+var regularProxy = httpProxy.createProxyServer({});
 var temCache = {};
 regularProxy.on('proxyRes', function (proxyRes, req, res) {
     log("receiveing data:"+req.url);
@@ -31,7 +31,7 @@ regularProxy.on('proxyRes', function (proxyRes, req, res) {
         saveToDB(queryParse["host"], queryParse, proxyResData);
     });
 
-    //console.log('RAW Response from the target', JSON.stringify(proxyRes.headers, true, 2));
+        //console.log('RAW Response from the target', JSON.stringify(proxyRes.headers, true, 2));
 });
 
 regularProxy.on('error', function (err, req, res) {
@@ -41,17 +41,9 @@ regularProxy.on('error', function (err, req, res) {
     res.end('Proxy return error.' + req.url);
 });
 
-regularProxy.on('proxyReq', function(proxyReq, req, res, options) {
-    if(req.method=="POST"&&req.body){
-        proxyReq.write(req.body);
-        log(req.body);
-        proxyReq.end();
-    }
-});
-
 var server = http.createServer(function(req, res) {
-    //   if (req.headers.host.toString().indexOf("jsonplaceholder") == -1)
-    //     return;
+ //   if (req.headers.host.toString().indexOf("jsonplaceholder") == -1)
+   //     return;
 
     var options = url.parse(req.url);
     options.headers = req.headers;
@@ -81,24 +73,12 @@ var server = http.createServer(function(req, res) {
             queryParse["queryData"] = requestData;
             findData(hostName, queryParse, function (item) {
                 if (item != null) {
-                    //writeJson(res, item);
+                    writeJson(res, item);
                 } else {
-                    var headers = {};
-                    if(req.method=="POST" && req.body){
-                        var data = JSON.stringify(req.body);
-                        req.body = data;
-                        headers = {
-                            "Content-Type": "application/json",
-                            "Content-Length": data.length
-                        }
-                    }
-                    regularProxy.web(req, res, {
-                        target: req.url,
-                        headers:headers
-                    });
+
                     temCache[req] = queryParse;
-                    log(queryParse["httpMethod"] + " : "+'http://' + req.headers.host);
-                    //regularProxy.web(req, res, {target: req.url, secure: false});
+                    log("try to find data: "+'http://' + req.headers.host);
+                    regularProxy.web(req, res, {target: req.url, secure: false});
 
 
                     //
@@ -115,10 +95,6 @@ var server = http.createServer(function(req, res) {
                 }
             });
         });
-        //setTimeout(function(){
-        //    regularProxy.web(req, res, {target: req.url, secure: false});
-        //}, 500);
-
     } else {
         var connector = http.request(options, function(serverResponse) {
             res.writeHeader(serverResponse.statusCode, serverResponse.headers);
