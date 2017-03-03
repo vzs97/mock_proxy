@@ -14,7 +14,7 @@ var url = require('url')
 
 var PORT = process.argv[2] || 9001;
 var DBLink = "mongodb://localhost:27017/mockDB";
-var ignoreDB = false;
+var ignoreDB = true;
 var regularProxy = httpProxy.createServer();
 var temCache = {};
 regularProxy.on('proxyRes', function (proxyRes, req, res) {
@@ -92,10 +92,7 @@ var server = http.createServer(function(req, res) {
                             "Content-Length": data.length
                         }
                     }
-                    regularProxy.web(req, res, {
-                        target: req.url,
-                        headers:headers
-                    });
+                    regularProxy.web(req, res, {target: req.url, secure: false});
                     temCache[req] = queryParse;
                     log(queryParse["httpMethod"] + " : "+'http://' + req.headers.host);
                     //regularProxy.web(req, res, {target: req.url, secure: false});
